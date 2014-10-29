@@ -1,0 +1,582 @@
+<?php 
+    function conference_proposal_permission() {
+        return array(
+            "access conference_proposal" => array(
+                "title" => t("Access proposal Portal"),
+                "description" => t("Allows users to view proposal postings.")
+            ),
+            "manage conference_proposal" => array(
+                "title" => t("Manage proposal Portal"),
+                "description" => t("Allows users to manage proposal postings.")
+            ),
+            "manage download_application" => array(
+                "title" => t("Manage Download Portal"),
+                "description" => t("Allows users to download proposal applications.")
+            ),
+        );
+    }
+
+    function conference_proposal_menu() {
+        $items = array();
+        $items["conference_proposal"] = array(
+            "title" => "Abstracts",
+            "page callback" => "conference_proposal_page",
+            "access arguments" => array("access conference_proposal"),
+            "type" => MENU_NORMAL_ITEM,
+        );
+        $items["conference_proposal/apply"] = array(
+            "title" => "Abstract Submission Form",
+            "page callback" => "conference_proposal_application_page",
+            "access arguments" => array("access conference_proposal"),
+            "type" => MENU_CALLBACK,
+        );
+        // $items["conference_proposal/edit"] = array(
+        //     "title" => "Edit Proposals form",
+        //     "page callback" => "conference_proposal_application_edit_page",
+        //     "access arguments" => array("access conference_proposal"),
+        //     "type" => MENU_CALLBACK,
+        // );        
+        $items["conference_proposal/view-applications"] = array(
+            "title" => "View Applications",
+            "page callback" => "conference_proposal_view_application_page",
+            "access arguments" => array("manage conference_proposal"),
+            "type" => MENU_CALLBACK,
+        ); 
+        // $items["conference_proposal/Edit-proposals"] = array(
+        //     "title" => "Edit Proposals",
+        //     "page callback" => "edit_conference_proposal_page",
+        //     "access arguments" => array("access conference_proposal"),
+        //     "type" => MENU_CALLBACK
+        // );               
+        // $items["conference_proposal/downloads_proposals"] = array(
+        //     "title" => "Application Download",
+        //     "description" => "Applications Download", 
+        //     "page callback" => "proposals_downloads_page",
+        //     "access arguments" => array("access proposal_portal"),
+        //     "type" => MENU_CALLBACK            
+        // );
+        $items["conference_proposal/ajax"] = array(
+            "title" => "Ajax callbacks",
+            "page callback" => "conference_proposal_ajax",
+            "access arguments" => array("access conference_proposal"),
+            "type" => MENU_CALLBACK
+        );
+        
+        return $items;
+    }
+
+    function conference_proposal_application_form($form, &$form_state, $proposal_id = 0) {
+        global $user;   
+           
+        $form = array();
+        $form["wrapper"] = array(
+            "#type" => "lable",
+            "#title" => t("Form"), 
+        );        
+        $form["wrapper"]["fname"] = array(
+            "#type" => "textfield",
+            "#title" => t("First Name"),                       
+            "#required" => TRUE,
+            '#attributes' => array(
+            "placeholder" => "Please enter your first name"
+            )           
+        );
+        $form["wrapper"]["lname"] = array(
+            "#type" => "textfield",
+            "#title" => t("Last Name"),                       
+            "#required" => TRUE,
+            '#attributes' => array(
+            "placeholder" => "Please enter your last name"
+            )
+        );
+        $form["wrapper"]["contributer"] = array(
+            "#type" => "textfield",
+            "#title" => t("Any Contributer"),  
+            '#attributes' => array(
+            "placeholder" => "Please enter contributers name"
+            )
+        );
+            
+        $form["wrapper"]["contact"] = array(
+            "#type" => "textfield",
+            "#title" => t("Contact"),          
+            "#required" => TRUE,
+            '#attributes' => array(
+            "placeholder" => "Please enter your contact number"
+            )           
+        );
+        $form["wrapper"]["email"] = array(
+            "#type" => "textfield",
+            "#title" => t("Email"),            
+            "#required" => TRUE,
+            '#default_value' => $user->mail,
+            '#attributes' => array(
+            "placeholder" => "Please enter your email"
+            )
+        );
+        $form["wrapper"]["proposal_id"] = array(
+          '#type' => 'select',
+          '#title' => t('Proposal Type'),
+          '#options' => get_conference_proposal_available("options"),
+          //'#description' => t(' you like to do'),
+          '#attributes' => array('disabled' => 'disabled'),
+          '#default_value' => $proposal_id,
+        );
+        $form["wrapper"]["title"] = array(
+            "#type" => "textfield", 
+            "#title" => t("Title"),                            
+            "#required" => TRUE,
+            '#attributes' => array(
+            "placeholder" => "Please enter your title"
+            )
+        );        
+        // $form["wrapper"]["abstract"] = array(
+        //     "#type" => "textarea",
+        //     "#title" => t("Abstract"),            
+        //     "#required" => TRUE,
+        //     '#attributes' => array(
+        //     "placeholder" => "Please enter your abstract"
+        //     )
+        // );
+        $form["wrapper"]["bio"] = array(
+            "#type" => "textarea",
+            "#title" => t("Bio"),
+            "#required" => TRUE,
+            '#attributes' => array(
+            "placeholder" => "Please enter your bio"
+            )
+        );
+        $form["wrapper"]["link"] = array(
+            "#type" => "textfield",
+            "#title" => t("Link"),            
+            '#attributes' => array(
+            "placeholder" => "Please enter proposal related link"
+            )           
+        );
+        $form["wrapper"]["abstract_file"] = array(
+            "#type" => "file",
+            "#title" => t("Abstract File" . required_star()),
+            "#description" => t("Please upload your abstract file in [.pdf] format"),
+        );
+        $form["wrapper"]["supported_file"] = array(
+            "#type" => "file",
+            "#title" => t("Supporting File"),
+            "#description" => t("Please upload your suporting file in [.zip] format"),
+        );
+        $form["wrapper"]["user_id"] = array(
+            "#type" => "hidden",
+            "#default_value" => $user->uid,
+          );
+        $form["wrapper"]["submit"] = array(
+            "#type" => "submit",
+            "#value" => "Submit Abstract"
+        );
+        return $form;    
+    }
+
+    function  conference_proposal_application_form_validate($form, &$form_state) {
+        $abstractfile = file_save_upload('abstract_file', array(
+            // Validate extensions.
+             
+            'file_validate_extensions' => array('pdf'), 
+                    
+        ));        
+        // If the file passed validation:
+        if ($abstractfile) {
+
+            // Move the file into the Drupal file system.
+            if ($abstractfile = file_move($abstractfile, 'public://')) {
+              // Save the file for use in the submit handler.
+              $form_state['storage']['abstract_file'] = $abstractfile;            
+            }
+            else {
+              form_set_error('abstract_file', t("Failed to uploaded file to the site's file folder."));
+            }
+        }
+        else {
+            form_set_error('abstract_file', t('No file was uploaded.'));
+        }
+        
+        /* validating email field */
+        if(!valid_email_address($form_state["values"]["email"])) {
+            form_set_error('email', t('Please enter an valid email address.'));
+        }
+
+        $supportedfile = file_save_upload('supported_file', array(
+            // Validate extensions.
+            'file_validate_extensions' => array('zip'),
+        ));        
+        // If the file passed validation:
+        if ($supportedfile) {
+            // Move the file into the Drupal file system.
+            if ($supportedfile = file_move($supportedfile, 'public://')) {
+              // Save the file for use in the submit handler.
+              $form_state['storage']['supported_file'] = $supportedfile;             
+            }
+            else {
+              form_set_error('supported_file', t("Failed to uploaded file to the site's file folder."));
+            }
+        }
+        else {
+            form_set_error('supported_file', t('No file was uploaded.'));
+        }
+    }
+
+    function conference_proposal_application_form_submit($form, &$form_state) {
+        $v = $form_state["values"];        
+        $abstract_file = $form_state["storage"]["abstract_file"];
+        
+        $supported_file = $form_state["storage"]["supported_file"];
+        $query = "
+            INSERT INTO proposal_applications
+            (first_name, last_name,  contributer, contact, email, title, bio, link, proposal_file, supported_file, proposal_id, uid)
+            VALUES
+            (:fname, :lname, :contributer, :contact, :email, :title, :bio, :link, :abstract_file, :supported_file, :proposal_id, :user_id)
+        ";
+        $args = array(
+           
+            ":fname" => $v["fname"], 
+            ":lname" => $v["lname"], 
+            ":contact" => $v["contact"],
+            ":contributer" => $v["contributer"],
+            ":email" => $v["email"], 
+            ":title" => $v["title"],              
+            //":abstract" => $v["abstract"], 
+            ":bio" => $v["bio"], 
+            ":link" => $v["link"], 
+            ":abstract_file" => $abstract_file->filename,
+            ":supported_file" => $supported_file->filename,
+            ":proposal_id" => $v["proposal_id"],
+            ":user_id" => $v["user_id"],
+        );
+        /* storing the row id in $result */
+        $result = db_query($query, $args, array('return' => Database::RETURN_INSERT_ID));
+        dpm($result);
+        
+        /* moving the file to uploads */
+        $base_path = $_SERVER['DOCUMENT_ROOT'] . base_path();
+        $uploads_dir = $base_path  . "uploads/proposal_file";
+        if(!file_exists($uploads_dir . "/{$result}/")) {
+            mkdir($uploads_dir . "/{$result}/", 0755, TRUE);
+        }
+
+
+ //        $from = "abstarct@scilab.in";
+ //        $to = $v["email"];
+ //       // $cc = $emails;
+ //        $bcc = "rush2jrp@gmail.com";
+ //        $subject = "Test Mail";
+ //        $message = "
+           
+ //            <p><em>Please check the abstract to this mail.</em></p>
+ //        ";
+ //        $file = $uploads_dir . "/{$result}/" . $abstract_file->filename;
+	// dpm($file);
+ //        $mail_status = send_mail_attachment($from, $to, "", $bcc, $subject, $message, $file);
+ //        if(!$mail_status) {
+ //            drupal_set_message("An error occurred while sending mail.", "error");
+ //        } else {
+ //            drupal_set_message("We have received your application. Thank you!", "status");
+ //        }
+
+        file_unmanaged_move($abstract_file->uri, $uploads_dir . "/{$result}/{$abstract_file->filename}");
+        drupal_set_message("Abstract Uploaded Succesfully");
+        file_unmanaged_move($supported_file->uri, $uploads_dir . "/{$result}/{$supported_file->filename}"); 
+        drupal_set_message("Supported files Uploaded Succesfully");          
+         /* cleaning up temporary storage */
+        file_delete($abstract_file);
+        unset($form["storage"]["abstract_file"]);
+        file_delete($supported_file);
+        unset($form["storage"]["supported_file"]); 
+
+        drupal_set_message("Thank you for submitting your abstract");
+       
+
+        /* sending notification to the applicant */
+        $subject = "Abstract received";
+        $message = "
+        Dear {$v['fname']},
+
+        We have received your abstract
+        We will get back to you shortly.
+
+        Regards,
+        FOSSEE Team
+                ";
+                send_mail("contact@fossee.in", $v["email"], $subject, $message);
+
+    }
+
+    function conference_proposal_page(){        
+       $output = ""; 
+        $i = 1;        
+        
+        $result = get_conference_proposal_available();
+        foreach($result as $row) {           
+            $output .= "
+                <strong>Proposal</strong>: {$row->proposal_name}<br>
+                <strong>Subbmission Guidelines</strong>: <br>{$row->proposal_requirement}<br>
+            ";
+            $output .= "<center>"; 
+            $output .= l("Submit Now ", "conference_proposal/apply/{$row->id}" , array(
+                "attributes" => array("class" => "btn btn-primary"),
+                "html" => TRUE,
+            ));
+            $output .= "</center><br>";          
+           
+            $i++;
+        }               
+        return $output;   
+        
+    }
+
+    function conference_proposal_view_application_page($proposal_id=0) {
+        $markup = "";
+        if(array_key_exists("saved", $_GET)){
+            drupal_set_message("Selections saved successfully.", "success");
+        }               
+        if($proposal_id) {
+            $result = db_select("proposal_applications")
+                ->fields("proposal_applications")
+                ->condition("proposal_id",$proposal_id)
+                ->execute()->fetchAll();
+                
+            $headers = array(
+                "#", "Name", "Bio" , "View abstract", "Download abstract", "Selected",
+            );
+            $rows = array();
+            $i = 1;
+            foreach($result as $row) {
+                $item = array(
+                    $i,
+                    $row->first_name.' '.$row->last_name,
+                     $row->bio,                    
+                    l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.pdf', "uploads/proposal_file/{$row->id}/{$row->proposal_file}", array("attributes" => array("target" => "_blank",))),
+                    l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.zip', "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
+                );
+                if($row->selected) {
+                    $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}' checked>";
+                } else {
+                    $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}'>";
+                }
+                array_push($item, $check);   
+                // $proposal = db_select("proposal_type")
+                //     ->fields("proposal_type")
+                //     ->condition("id", $proposal_id)
+                //     ->execute()->fetchObject();
+                
+                // $base_path= $_SERVER['DOCUMENT_ROOT'] . base_path(); 
+                // $downloads_dir = "uploads/proposal_file/{$row->id}/{$row->proposal_file}";
+                // $files = $downloads_dir; 
+                // $zipname = str_replace(' ','_',strtolower($proposal->proposal_name.'_'.'.zip'));
+                // $zip = new ZipArchive;
+                // $zip->open($zipname, ZipArchive::CREATE); 
+                // $zip->addFile($files, str_replace('.','_',str_replace(' ','_',strtolower("{$row->id} {$row->first_name} {$row->last_name}" ))) . ".pdf");   
+                // $zip->close();
+  
+                array_push($rows, $item);
+                $i++;
+            }
+
+            $proposal = db_select("proposal_type")
+                ->fields("proposal_type")
+                ->condition("id", $proposal_id)
+                ->execute()->fetchObject();
+            $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications");
+            $markup .= "<div style='float:right'>";
+            $markup .= l("Download all applications", "conference_proposal/downloads_applications/{$row->proposal_id}/{$row->id}");
+            $markup .= "</div>";  
+            $markup .= "<h5><u>{$proposal->proposal_name} - List of applications</u></h5>";
+            $markup .= bootstrap_table($headers, $rows);
+            $markup .= l("Save Selections", "conference_proposal/view-applications/",
+                array(
+                    "query" => array(
+                        "saved" => "true"
+                    ),
+                    "attributes" => array(
+                        "class" => "btn btn-primary"
+                    )
+                )
+            );
+        } else {
+            /* List all the job positions.
+             * Change the condition later based on end date.
+            */
+            $result = db_select("proposal_type")
+                ->fields("proposal_type")
+                ->condition("status", 0, '<>')
+                ->execute()->fetchAll();
+            $headers = array(
+                "#", "Proposal", "Time", "Action",
+            );
+            $rows = array();
+            foreach($result as $row) {
+                $item = array(
+                    $row->id,
+                    "{$row->proposal_name}",
+                    $row->time,
+                    l("View applications", "conference_proposal/view-applications/{$row->id}")
+                );
+                array_push($rows, $item);
+            }
+            $markup .= "<h5><u>List of Proposals</u></h5>";
+            $markup .= bootstrap_table($headers, $rows);
+        }
+        $output = array(
+            "positions_list" => array(
+                "#prefix" => "<div id='positions-list'>",
+                "#markup" => $markup,
+                "#suffix" => "</div>",
+            ),
+        );
+        return $output;
+    }
+
+    function conference_proposal_application_page($proposal_id=0){
+        $application_form = "";
+        if($proposal_id) {
+             $application_form = drupal_get_form("conference_proposal_application_form", $proposal_id);
+             $application_form = drupal_render($application_form);            
+        } else {
+             $application_form = drupal_get_form("conference_proposal_application_form");
+             $application_form = drupal_render($application_form);  
+        }
+        $output = array(
+            "application_form" => array(
+                "#prefix" => "",
+                "#markup" => $application_form,
+                "#suffix" => "",
+            )
+        );
+        return $output;
+    }
+
+    function get_conference_proposal_available($key="") {
+        $result = db_select("proposal_type")
+            ->fields("proposal_type")
+            ->condition("status", 1)
+            ->execute()->fetchAll();        
+        if($key == "options") {
+            $options = array();
+            foreach($result as $row) {
+                $options[$row->id] = "{$row->proposal_name}";
+            }
+            return $options;
+        } else {
+            return $result;
+               }
+    }
+
+     function conference_proposal_ajax($item="", $key="") {
+        $data = "";
+        if($item == "shortlist") {
+            $query = "
+                UPDATE proposal_applications
+                SET selected = !selected
+                WHERE id = aid
+            ";
+            $args = array(
+                ":aid" => $key
+            );
+            db_query($query, $args);
+            $data = "updated";
+        }
+        echo $data;
+        exit();
+    }
+    function conference_proposal_init() {
+        drupal_add_js("misc/form.js");
+        drupal_add_js("misc/collapse.js");
+        drupal_add_js(
+            drupal_get_path('module', 'conference_proposal') . '/js/main.js',
+            array(
+                'group' => JS_THEME,
+                'weight' => 20,
+                'every_page' => TRUE,
+                'cache' => TRUE,
+                //'scope' => 'header',
+            )
+        );
+    }
+    function required_star() {
+        return "<span class='form-required' title='This field is required.'> *</span>";
+    }
+
+     function bootstrap_table($headers, $rows) {
+        $thead = "";
+        $tbody = "";
+        foreach($headers as $header) {
+            $thead .= "<th>{$header}</th>";
+        }
+        foreach($rows as $row) {
+            $tbody .= "<tr>";
+            foreach($row as $data) {
+                $tbody .= "<td>{$data}</td>";
+            }
+            $tbody .= "</tr>";
+        }
+        $table = "
+            <table class='table table-bordered table-hover'>
+                <thead>{$thead}</thead>
+                <tbody>{$tbody}</tbody>
+            </table>
+        ";
+        return $table;
+    } 
+    
+    /**
+     * Simple wrapper function for drupal_mail() to avoid extraneous code.
+    */
+    function send_mail($from, $to, $subject, $message) {
+        $my_module = 'conference_proposal';
+        $my_mail_token = microtime();
+        $message = array(
+            'id' => $my_module . '_' . $my_mail_token,
+            'to' => $to,
+            'subject' => $subject,
+            'body' => array($message),
+            'headers' => array(
+                'From' => $from, 
+                'Sender' => $from, 
+                'Return-Path' => $from,
+                'Bcc' => 'prashantsinalkar@gmail.com',
+            ),
+        );
+        $system = drupal_mail_system($my_module, $my_mail_token);
+        $message = $system->format($message);
+        if ($system->mail($message)) {
+            return TRUE;
+        }
+        else {
+            return FALSE;
+        }
+    }
+
+    function send_mail_attachment($from, $to, $cc, $bcc, $subject, $message, $file) {
+        // $file should include path and filename
+        $filename = basename($file);
+        $file_size = filesize($file);
+        $content = chunk_split(base64_encode(file_get_contents($file))); 
+        $uid = md5(uniqid(time()));
+        $from = str_replace(array("\r", "\n"), '', $from); // to prevent email injection
+        $header = "From: ".$from."\r\n"
+            ."Cc: ".$cc."\r\n"
+            ."Bcc: ".$bcc."\r\n"
+            ."MIME-Version: 1.0\r\n"
+            ."Content-Type: multipart/mixed; boundary=\"".$uid."\"\r\n\r\n"
+            ."This is a multi-part message in MIME format.\r\n" 
+            ."--".$uid."\r\n"
+            ."Content-type: text/html; charset=UTF-8; format=flowed\r\n"
+            ."Content-Transfer-Encoding: 7bit\r\n\r\n"
+            .$message."\r\n\r\n"
+            ."--".$uid."\r\n"
+            ."Content-Type: application/octet-stream; name=\"".$filename."\"\r\n"
+            ."Content-Transfer-Encoding: base64\r\n"
+            ."Content-Disposition: attachment; filename=\"".$filename."\"\r\n\r\n"
+            .$content."\r\n\r\n"
+            ."--".$uid."--"; 
+        return mail($to, $subject, "", $header);
+    }
+
+    
+    ?>

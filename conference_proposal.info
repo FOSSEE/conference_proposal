@@ -1,0 +1,8 @@
+name = conference_proposal
+description = conference_proposal for FOSSEE recruitments.
+package = conference_proposal
+core = 7.x
+
+stylesheets[all][] = css/base.css
+stylesheets[all][] = css/main.css
+stylesheets[all][] = css/table.css

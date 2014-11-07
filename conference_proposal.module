@@ -342,7 +342,7 @@
                     $row->first_name.' '.$row->last_name,
                      $row->bio,                    
                     l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.pdf', "uploads/proposal_file/{$row->id}/{$row->proposal_file}", array("attributes" => array("target" => "_blank",))),
-                    l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.zip', "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
+                    l("{$row->proposal_file}", "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
                 );
                 if($row->selected) {
                     $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}' checked>";
@@ -376,7 +376,7 @@
 
             $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications");
             $markup .= "<div style='float:right'>";
-            $markup .= l("Download all applications", "conference_proposal/downloads_applications/{$row->proposal_id}/{$row->id}");
+           // $markup .= l("Download all applications", "conference_proposal/downloads_applications/{$row->proposal_id}/{$row->id}");
             $markup .= "</div>";  
             $markup .= "<h5><u>{$proposal->proposal_name} - List of applications</u></h5>";
             $markup .= bootstrap_table($headers, $rows);

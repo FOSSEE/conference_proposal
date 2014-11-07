@@ -127,7 +127,7 @@
             "#title" => t("Title"),                            
             "#required" => TRUE,
             '#attributes' => array(
-            "placeholder" => "Please enter the title of your abstract"
+            "placeholder" => "Please enter your abstract title"
             )
         );        
         // $form["wrapper"]["abstract"] = array(
@@ -143,7 +143,7 @@
             "#title" => t("Bio"),
             "#required" => TRUE,
             '#attributes' => array(
-            "placeholder" => "Please enter your bio"
+            "placeholder" => "Please enter your short bio"
             )
         );
         $form["wrapper"]["link"] = array(
@@ -162,6 +162,7 @@
             "#type" => "file",
             "#title" => t("Supporting File"),
             "#description" => t("Please upload your suporting file in [.zip] format"),
+
         );
         $form["wrapper"]["user_id"] = array(
             "#type" => "hidden",
@@ -175,16 +176,17 @@
     }
 
     function  conference_proposal_application_form_validate($form, &$form_state) {
-       	if (!preg_match('/^[0-9\ \+]{0,15}$/', $form_state['values']['contact']))
-       form_set_error('contact', t('Invalid concat number'));
-	 $abstractfile = file_save_upload('abstract_file', array(
+        if (!preg_match('/^[0-9\ \+]{0,15}$/', $form_state['values']['contact']))
+        form_set_error('contact', t('Invalid concat number'));
+
+        $abstractfile = file_save_upload('abstract_file', array(
             // Validate extensions.
              
             'file_validate_extensions' => array('pdf'), 
                     
         ));        
         // If the file passed validation:
-        if (!empty($abstractfile->filename)) {
+        if ($abstractfile) {
 
             // Move the file into the Drupal file system.
             if ($abstractfile = file_move($abstractfile, 'public://')) {
@@ -209,7 +211,7 @@
             'file_validate_extensions' => array('zip'),
         ));        
         // If the file passed validation:
-        if (!empty($supportedfile->filename)) {
+        if ($supportedfile) {
             // Move the file into the Drupal file system.
             if ($supportedfile = file_move($supportedfile, 'public://')) {
               // Save the file for use in the submit handler.
@@ -219,19 +221,18 @@
               form_set_error('supported_file', t("Failed to uploaded file to the site's file folder."));
             }
         }
-        else {
-            // form_set_error('supported_file', t('No file was uploaded.'));
-        }
+        // else {
+        //     form_set_error('supported_file', t('No file was uploaded.'));
+        // }
     }
 
     function conference_proposal_application_form_submit($form, &$form_state) {
         $v = $form_state["values"];        
         $abstract_file = $form_state["storage"]["abstract_file"];
-        
-        if(isset($supported_file)) {
-            $supported_file = $form_state["storage"]["supported_file"];
-        }
-        
+         
+        $supported_file = $form_state["storage"]["supported_file"];
+
+       
         $query = "
             INSERT INTO proposal_applications
             (first_name, last_name,  contributer, contact, email, title, bio, link, proposal_file, supported_file, proposal_id, uid)
@@ -250,48 +251,65 @@
             ":bio" => $v["bio"], 
             ":link" => $v["link"], 
             ":abstract_file" => $abstract_file->filename,
-            ":supported_file" => isset($supported_file) ? $supported_file->filename : 'None',
+            ":supported_file" => $supported_file->filename,
             ":proposal_id" => $v["proposal_id"],
             ":user_id" => $v["user_id"],
         );
         /* storing the row id in $result */
         $result = db_query($query, $args, array('return' => Database::RETURN_INSERT_ID));
-                /* moving the file to uploads */
+        dpm($result);
+        
+        /* moving the file to uploads */
         $base_path = $_SERVER['DOCUMENT_ROOT'] . base_path();
         $uploads_dir = $base_path  . "uploads/proposal_file";
         if(!file_exists($uploads_dir . "/{$result}/")) {
             mkdir($uploads_dir . "/{$result}/", 0755, TRUE);
         }
-        
-        if($abstract_file->filename){
-            file_unmanaged_move($abstract_file->uri, $uploads_dir . "/{$result}/{$abstract_file->filename}");
-            file_delete($abstract_file);
-            drupal_set_message("Abstract Uploaded Succesfully");
-        }
-        if(isset($supported_file)) {
-            file_unmanaged_move($supported_file->uri, $uploads_dir . "/{$result}/{$supported_file->filename}"); 
-            file_delete($supported_file);
-            drupal_set_message("Supported files Uploaded Succesfully");          
-        }
+
+
+ //        $from = "abstarct@scilab.in";
+ //        $to = $v["email"];
+ //       // $cc = $emails;
+ //        $bcc = "rush2jrp@gmail.com";
+ //        $subject = "Test Mail";
+ //        $message = "
+           
+ //            <p><em>Please check the abstract to this mail.</em></p>
+ //        ";
+ //        $file = $uploads_dir . "/{$result}/" . $abstract_file->filename;
+	// dpm($file);
+ //        $mail_status = send_mail_attachment($from, $to, "", $bcc, $subject, $message, $file);
+ //        if(!$mail_status) {
+ //            drupal_set_message("An error occurred while sending mail.", "error");
+ //        } else {
+ //            drupal_set_message("We have received your application. Thank you!", "status");
+ //        }
+
+        file_unmanaged_move($abstract_file->uri, $uploads_dir . "/{$result}/{$abstract_file->filename}");
+        drupal_set_message("Abstract Uploaded Succesfully");
+        file_unmanaged_move($supported_file->uri, $uploads_dir . "/{$result}/{$supported_file->filename}"); 
+        drupal_set_message("Supported files Uploaded Succesfully");          
          /* cleaning up temporary storage */
+        file_delete($abstract_file);
         unset($form["storage"]["abstract_file"]);
+        file_delete($supported_file);
         unset($form["storage"]["supported_file"]); 
 
         drupal_set_message("Thank you for submitting your abstract");
        
 
         /* sending notification to the applicant */
-	$subject = " {$v['title']} - Abstract received";
+        $subject = " {$v['title']} -Abstract received";
         $message = "
         Dear {$v['fname']},
 
-        We have received your abstract
+        We have received your abstract 
         We will get back to you shortly.
 
         Regards,
-        Scilab Team
+        FOSSEE Team
                 ";
-                send_mail("conference@scilab.in", $v["email"], $subject, $message);
+               // send_mail("conference@scilab.in", $v["email"], $subject, $message);
 
     }
 
@@ -328,9 +346,7 @@
                 ->fields("proposal_applications")
                 ->condition("proposal_id",$proposal_id)
                 ->execute()->fetchAll();
-        if(!$result){ 
-            $markup .= "<h3 style='color:red'>No abstract uploaded</h3>";
-        }else{
+                
             $headers = array(
                 "#", "Name", "Bio" , "View abstract", "Download abstract", "Selected",
             );
@@ -340,16 +356,15 @@
                 $item = array(
                     $i,
                     $row->first_name.' '.$row->last_name,
-                     $row->bio,                    
+                     $row->bio,
                     l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.pdf', "uploads/proposal_file/{$row->id}/{$row->proposal_file}", array("attributes" => array("target" => "_blank",))),
                     l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.zip', "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
                 );
                 if($row->selected) {
                     $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}' checked>";
-                } else
-                    {
+                } else {
                     $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}'>";
-                    }
+                }
                 array_push($item, $check);   
                 // $proposal = db_select("proposal_type")
                 //     ->fields("proposal_type")
@@ -373,7 +388,6 @@
                 ->fields("proposal_type")
                 ->condition("id", $proposal_id)
                 ->execute()->fetchObject();
-
             $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications");
             $markup .= "<div style='float:right'>";
             $markup .= l("Download all applications", "conference_proposal/downloads_applications/{$row->proposal_id}/{$row->id}");
@@ -390,7 +404,7 @@
                     )
                 )
             );
-        } }else {
+        } else {
             /* List all the job positions.
              * Change the condition later based on end date.
             */
@@ -471,8 +485,8 @@
                 ":aid" => $key
             );
             db_query($query, $args);
-            $data = "updated";
-        }
+            $data = "updated";        }    
+        dpm($query);
         echo $data;
         exit();
     }
@@ -531,8 +545,7 @@
                 'From' => $from, 
                 'Sender' => $from, 
                 'Return-Path' => $from,
-		'cc' =>'conference@scilab.in',
-                'Bcc' => 'prashantsinalkar@gmail.com , priyankabhagwat085@gmail.com',
+                'Bcc' => 'prashantsinalkar@gmail.com',
             ),
         );
         $system = drupal_mail_system($my_module, $my_mail_token);
@@ -573,4 +586,3 @@
 
     
     ?>
-

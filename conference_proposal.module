@@ -29,32 +29,20 @@
             "page callback" => "conference_proposal_application_page",
             "access arguments" => array("access conference_proposal"),
             "type" => MENU_CALLBACK,
-        );
-        // $items["conference_proposal/edit"] = array(
-        //     "title" => "Edit Proposals form",
-        //     "page callback" => "conference_proposal_application_edit_page",
-        //     "access arguments" => array("access conference_proposal"),
-        //     "type" => MENU_CALLBACK,
-        // );        
+        );            
         $items["conference_proposal/view-applications"] = array(
             "title" => "View Applications",
             "page callback" => "conference_proposal_view_application_page",
             "access arguments" => array("manage conference_proposal"),
             "type" => MENU_CALLBACK,
-        ); 
-        // $items["conference_proposal/Edit-proposals"] = array(
-        //     "title" => "Edit Proposals",
-        //     "page callback" => "edit_conference_proposal_page",
-        //     "access arguments" => array("access conference_proposal"),
-        //     "type" => MENU_CALLBACK
-        // );               
-        // $items["conference_proposal/downloads_proposals"] = array(
-        //     "title" => "Application Download",
-        //     "description" => "Applications Download", 
-        //     "page callback" => "proposals_downloads_page",
-        //     "access arguments" => array("access proposal_portal"),
-        //     "type" => MENU_CALLBACK            
-        // );
+        );                    
+        $items["conference_proposal/downloads_proposals"] = array(
+            "title" => "Abstracts Download",
+            "description" => "Abstracts Download", 
+            "page callback" => "conference_proposal_downloads_applications_page",
+            "access arguments" => array("manage download_application"),
+            "type" => MENU_CALLBACK            
+        );
         $items["conference_proposal/ajax"] = array(
             "title" => "Ajax callbacks",
             "page callback" => "conference_proposal_ajax",
@@ -175,9 +163,9 @@
     }
 
     function  conference_proposal_application_form_validate($form, &$form_state) {
-       	if (!preg_match('/^[0-9\ \+]{0,15}$/', $form_state['values']['contact']))
-       form_set_error('contact', t('Invalid concat number'));
-	 $abstractfile = file_save_upload('abstract_file', array(
+        if (!preg_match('/^[0-9\ \+]{0,15}$/', $form_state['values']['contact']))
+            form_set_error('contact', t('Invalid concat number'));
+            $abstractfile = file_save_upload('abstract_file', array(
             // Validate extensions.
              
             'file_validate_extensions' => array('pdf'), 
@@ -250,7 +238,7 @@
             ":bio" => $v["bio"], 
             ":link" => $v["link"], 
             ":abstract_file" => $abstract_file->filename,
-            ":supported_file" => isset($supported_file) ? $supported_file->filename : 'None',
+            ":supported_file" => isset($supported_file) ? $supported_file->filename : 'No files uploded',
             ":proposal_id" => $v["proposal_id"],
             ":user_id" => $v["user_id"],
         );
@@ -281,7 +269,7 @@
        
 
         /* sending notification to the applicant */
-	$subject = " {$v['title']} - Abstract received";
+    $subject = " {$v['title']} - Abstract received";
         $message = "
         Dear {$v['fname']},
 
@@ -291,7 +279,7 @@
         Regards,
         Scilab Team
                 ";
-                send_mail("conference@scilab.in", $v["email"], $subject, $message);
+                //send_mail("conference@scilab.in", $v["email"], $subject, $message);
 
     }
 
@@ -329,20 +317,21 @@
                 ->condition("proposal_id",$proposal_id)
                 ->execute()->fetchAll();
         if(!$result){ 
-            $markup .= "<h3 style='color:red'>No abstract uploaded</h3>";
+            $markup .= "<h4 style='color:red'>No abstract submitted</h4>";
         }else{
             $headers = array(
-                "#", "Name", "Bio" , "View abstract", "Download abstract", "Selected",
+                "#", "Name", "Title" , "View abstract", "Supporting file", "Selected",
             );
             $rows = array();
             $i = 1;
             foreach($result as $row) {
+
                 $item = array(
                     $i,
-                    $row->first_name.' '.$row->last_name,
-                     $row->bio,                    
+                    ucfirst(strtolower("{$row->first_name}")).' '.ucfirst(strtolower("{$row->last_name}")),
+                    str_replace('\' ', '\'', ucwords(str_replace('\'', '\' ', strtolower("{$row->title}")))),             
                     l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.pdf', "uploads/proposal_file/{$row->id}/{$row->proposal_file}", array("attributes" => array("target" => "_blank",))),
-                    l("{$row->proposal_file}", "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
+                    l("{$row->supported_file}", "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
                 );
                 if($row->selected) {
                     $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}' checked>";
@@ -350,21 +339,7 @@
                     {
                     $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}'>";
                     }
-                array_push($item, $check);   
-                // $proposal = db_select("proposal_type")
-                //     ->fields("proposal_type")
-                //     ->condition("id", $proposal_id)
-                //     ->execute()->fetchObject();
-                
-                // $base_path= $_SERVER['DOCUMENT_ROOT'] . base_path(); 
-                // $downloads_dir = "uploads/proposal_file/{$row->id}/{$row->proposal_file}";
-                // $files = $downloads_dir; 
-                // $zipname = str_replace(' ','_',strtolower($proposal->proposal_name.'_'.'.zip'));
-                // $zip = new ZipArchive;
-                // $zip->open($zipname, ZipArchive::CREATE); 
-                // $zip->addFile($files, str_replace('.','_',str_replace(' ','_',strtolower("{$row->id} {$row->first_name} {$row->last_name}" ))) . ".pdf");   
-                // $zip->close();
-  
+                array_push($item, $check);
                 array_push($rows, $item);
                 $i++;
             }
@@ -374,11 +349,11 @@
                 ->condition("id", $proposal_id)
                 ->execute()->fetchObject();
 
-            $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications");
+            $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications", array("attributes" => array("target" => "_blank","class" =>"btn btn-primary" )));
             $markup .= "<div style='float:right'>";
-           // $markup .= l("Download all applications", "conference_proposal/downloads_applications/{$row->proposal_id}/{$row->id}");
+            $markup .= l("Download All Abstracts", "conference_proposal/downloads_proposals/{$row->proposal_id}/{$row->id}", array("attributes" => array("target" => "_blank","class" =>"btn btn-primary" )));
             $markup .= "</div>";  
-            $markup .= "<h5><u>{$proposal->proposal_name} - List of applications</u></h5>";
+            $markup .= "<h5><u>{$proposal->proposal_name} - List of Abstracts</u></h5>";
             $markup .= bootstrap_table($headers, $rows);
             $markup .= l("Save Selections", "conference_proposal/view-applications/",
                 array(
@@ -407,7 +382,7 @@
                     $row->id,
                     "{$row->proposal_name}",
                     $row->time,
-                    l("View applications", "conference_proposal/view-applications/{$row->id}")
+                    l("View Abstracts", "conference_proposal/view-applications/{$row->id}")
                 );
                 array_push($rows, $item);
             }
@@ -422,6 +397,49 @@
             ),
         );
         return $output;
+    }
+
+    function conference_proposal_downloads_applications_page($proposal_id){
+       if($proposal_id){
+        
+
+            $result = db_select("proposal_applications")
+                ->fields("proposal_applications")
+                ->condition("proposal_id",$proposal_id)
+                ->execute()->fetchAll();
+
+            $proposal = db_select("proposal_type")
+                ->fields("proposal_type")
+                ->condition("id", $proposal_id)
+                ->execute()->fetchObject();
+
+            foreach($result as $row){    
+                
+                $base_path= $_SERVER['DOCUMENT_ROOT'] . base_path(); 
+                $downloads_dir = "uploads/proposal_file/{$row->id}/{$row->proposal_file}";
+                $files = $downloads_dir; 
+                $zipname = str_replace(' ','_',strtolower($proposal->proposal_name.'.zip'));
+                $zip = new ZipArchive;
+                $zip->open($zipname, ZipArchive::CREATE); 
+                $zip->addFile($files, str_replace('.','_',str_replace(' ','_',strtolower("{$row->id} {$row->first_name} {$row->last_name}" ))) . ".pdf");   
+                $zip->close();
+                chmod($base_path.$zipname, 0755);
+                
+            }
+        }                
+            $proposal = db_select("proposal_type")
+                    ->fields("proposal_type")
+                    ->condition("id", $proposal_id)
+                    ->execute()->fetchObject();
+
+            $base_path= $_SERVER['DOCUMENT_ROOT'] . base_path();
+            $zipname = str_replace(' ','_',strtolower($proposal->proposal_name.'.zip'));
+            ob_clean();
+            header('Content-Type: application/zip');
+            header('Content-disposition: attachment; filename= "'.str_replace(' ','_',strtolower($proposal->proposal_name.'.zip')));
+            header('Content-Length: ' . filesize($base_path.$zipname));
+            readfile($zipname);
+            exit;
     }
 
     function conference_proposal_application_page($proposal_id=0){
@@ -531,7 +549,7 @@
                 'From' => $from, 
                 'Sender' => $from, 
                 'Return-Path' => $from,
-		'cc' =>'conference@scilab.in',
+                'cc' =>'conference@scilab.in',
                 'Bcc' => 'prashantsinalkar@gmail.com , priyankabhagwat085@gmail.com',
             ),
         );

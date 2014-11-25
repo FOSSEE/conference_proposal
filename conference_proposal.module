@@ -35,13 +35,19 @@
             "page callback" => "conference_proposal_view_application_page",
             "access arguments" => array("manage conference_proposal"),
             "type" => MENU_CALLBACK,
-        );                    
+        );
+        $items["conference_proposal/view-proposals"] = array(
+            "title" => "View Abstracts",
+            "page callback" => "conference_proposal_view_proposals_page",
+            "access arguments" => array("manage conference_proposal"),
+            "type" => MENU_CALLBACK,
+        );
         $items["conference_proposal/downloads_proposals"] = array(
             "title" => "Abstracts Download",
             "description" => "Abstracts Download", 
             "page callback" => "conference_proposal_downloads_applications_page",
             "access arguments" => array("manage download_application"),
-            "type" => MENU_CALLBACK            
+            "type" => MENU_CALLBACK 
         );
         $items["conference_proposal/ajax"] = array(
             "title" => "Ajax callbacks",
@@ -329,8 +335,8 @@
                 $item = array(
                     $i,
                     ucfirst(strtolower("{$row->first_name}")).' '.ucfirst(strtolower("{$row->last_name}")),
-                    str_replace('\' ', '\'', ucwords(str_replace('\'', '\' ', strtolower("{$row->title}")))),             
-                    l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.pdf', "uploads/proposal_file/{$row->id}/{$row->proposal_file}", array("attributes" => array("target" => "_blank",))),
+                    str_replace('\'', '\'', ucwords(str_replace('\'', '\' ', strtolower("{$row->title}")))),                    
+                    l(str_replace('.', '_',str_replace(' ', '_',strtolower("{$row->id}_{$row->first_name}_{$row->last_name}"))) . '.pdf', "conference_proposal/view-proposals/{$row->proposal_id}/{$row->id}", array("attributes" => array("target" => ""))),
                     l("{$row->supported_file}", "uploads/proposal_file/{$row->id}/{$row->supported_file}", array("attributes" => array("target" => "_blank",))),
                 );
                 if($row->selected) {
@@ -349,7 +355,7 @@
                 ->condition("id", $proposal_id)
                 ->execute()->fetchObject();
 
-            $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications", array("attributes" => array("target" => "_blank","class" =>"btn btn-primary" )));
+            $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications", array("attributes" => array("class" =>"btn btn-primary" )));
             $markup .= "<div style='float:right'>";
             $markup .= l("Download All Abstracts", "conference_proposal/downloads_proposals/{$row->proposal_id}/{$row->id}", array("attributes" => array("target" => "_blank","class" =>"btn btn-primary" )));
             $markup .= "</div>";  
@@ -399,47 +405,74 @@
         return $output;
     }
 
-    function conference_proposal_downloads_applications_page($proposal_id){
-       if($proposal_id){
-        
-
+    function conference_proposal_view_proposals_page($proposal_id, $id) {
+       $markup = "";
+        if($proposal_id) {
             $result = db_select("proposal_applications")
                 ->fields("proposal_applications")
-                ->condition("proposal_id",$proposal_id)
+                ->condition("proposal_id", $proposal_id)
+                ->condition("id", $id)
                 ->execute()->fetchAll();
+                        
+            $headers = array(
+               "Name", "Title" , "Selected",
+            );
+            foreach($result as $row) {
+            $rows = array();
 
-            $proposal = db_select("proposal_type")
-                ->fields("proposal_type")
-                ->condition("id", $proposal_id)
-                ->execute()->fetchObject();
-
-            foreach($result as $row){    
-                
-                $base_path= $_SERVER['DOCUMENT_ROOT'] . base_path(); 
-                $downloads_dir = "uploads/proposal_file/{$row->id}/{$row->proposal_file}";
-                $files = $downloads_dir; 
-                $zipname = str_replace(' ','_',strtolower($proposal->proposal_name.'.zip'));
-                $zip = new ZipArchive;
-                $zip->open($zipname, ZipArchive::CREATE); 
-                $zip->addFile($files, str_replace('.','_',str_replace(' ','_',strtolower("{$row->id} {$row->first_name} {$row->last_name}" ))) . ".pdf");   
-                $zip->close();
-                chmod($base_path.$zipname, 0755);
-                
+                $item = array(
+                    
+                    ucfirst(strtolower("{$row->first_name}")).' '.ucfirst(strtolower("{$row->last_name}")),
+                    str_replace('\' ', '\'', ucwords(str_replace('\'', '\' ', strtolower("{$row->title}")))),        
+                    
+                );
+                if($row->selected) {
+                    $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}' checked>";
+                } else
+                    {
+                    $check = "<input class='shortlist' type='checkbox' data-aid='{$row->id}'>";
+                    }
+                array_push($item, $check);
+                array_push($rows, $item);
             }
-        }                
-            $proposal = db_select("proposal_type")
-                    ->fields("proposal_type")
-                    ->condition("id", $proposal_id)
-                    ->execute()->fetchObject();
+                               
+            } 
+            /* List all the job positions.
+             * Change the condition later based on end date.
+            */
 
-            $base_path= $_SERVER['DOCUMENT_ROOT'] . base_path();
-            $zipname = str_replace(' ','_',strtolower($proposal->proposal_name.'.zip'));
-            ob_clean();
-            header('Content-Type: application/zip');
-            header('Content-disposition: attachment; filename= "'.str_replace(' ','_',strtolower($proposal->proposal_name.'.zip')));
-            header('Content-Length: ' . filesize($base_path.$zipname));
-            readfile($zipname);
-            exit;
+           
+            $markup .=  "<br />";  
+            $markup .= l("View PDF", "uploads/proposal_file/{$row->id}/{$row->proposal_file}", array("attributes" => array("target" => "pdf","class" =>"btn btn-primary" )));
+            $markup .=  "<br />";  
+            $markup .=  "<br />";     
+            $markup .= "<iframe src='' name='pdf' width='850' height='725' id='frs'></iframe>";
+            $markup .= bootstrap_table($headers, $rows);
+            $markup .= l("<< Back to the list of Proposals", "conference_proposal/view-applications/{$row->proposal_id}", array("attributes" => array("class" =>"btn btn-primary" )));
+            
+            $markup .= "<div id='disqus_thread'></div>
+                        <script type='text/javascript'>
+                            /* * * CONFIGURATION VARIABLES: EDIT BEFORE PASTING INTO YOUR WEBPAGE * * */
+                            var disqus_shortname = 'scilabconference'; // required: replace example with your forum shortname
+
+                            /* * * DON'T EDIT BELOW THIS LINE * * */
+                            (function() {
+                                var dsq = document.createElement('script'); dsq.type = 'text/javascript'; dsq.async = true;
+                                dsq.src = '//' + disqus_shortname + '.disqus.com/embed.js';
+                                (document.getElementsByTagName('head')[0] || document.getElementsByTagName('body')[0]).appendChild(dsq);
+                            })();
+                        </script>
+                        <noscript>Please enable JavaScript to view the <a href='http://disqus.com/?ref_noscript'>comments powered by Disqus.</a></noscript>
+                        ";
+             
+        $output = array(
+            "positions_list" => array(
+                "#prefix" => "<div id='positions-list'>",
+                "#markup" => $markup,
+                "#suffix" => "</div>",
+            ),
+        );
+        return $output;
     }
 
     function conference_proposal_application_page($proposal_id=0){
@@ -494,6 +527,7 @@
         echo $data;
         exit();
     }
+
     function conference_proposal_init() {
         drupal_add_js("misc/form.js");
         drupal_add_js("misc/collapse.js");
@@ -512,7 +546,7 @@
         return "<span class='form-required' title='This field is required.'> *</span>";
     }
 
-     function bootstrap_table($headers, $rows) {
+    function bootstrap_table($headers, $rows) {
         $thead = "";
         $tbody = "";
         foreach($headers as $header) {
@@ -590,5 +624,5 @@
     }
 
     
-    ?>
+?>
 
